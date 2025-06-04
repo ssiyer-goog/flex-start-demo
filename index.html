@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flex-start GPU Cost & Availability Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Use a Google-style font */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        /* Custom styles for animated bars */
+        .bar {
+            transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+            border-radius: 6px 6px 0 0;
+        }
+
+        /* Custom styles for input range sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            outline: none;
+            opacity: 0.9;
+            transition: opacity .2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1a73e8;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #1a73e8;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .timeline-bar {
+            display: flex;
+            height: 40px;
+            border-radius: 6px;
+            overflow: hidden;
+            font-size: 12px;
+            color: white;
+            font-weight: 500;
+        }
+        .timeline-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            white-space: nowrap;
+            padding: 0 10px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Flex-start GPU Cost & Availability Simulator</h1>
+            <p class="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">See how Flex-start can lower your costs by providing discounted GPUs for workloads with flexible start times.</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+
+            <!-- Control Panel -->
+            <div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-xl font-bold mb-6 border-b pb-3 text-gray-700">1. Configure Your Workload</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label for="gpu-type" class="block text-sm font-medium text-gray-700 mb-1">GPU Type</label>
+                        <select id="gpu-type" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="L4">L4</option>
+                            <option value="A100_40GB">A100 (40GB)</option>
+                            <option value="H100_80GB" selected>H100 (80GB)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="num-gpus" class="block text-sm font-medium text-gray-700">Number of GPUs: <span id="num-gpus-value" class="font-bold text-blue-600">8</span></label>
+                        <input type="range" id="num-gpus" min="1" max="64" value="8" class="mt-2">
+                    </div>
+                    <div>
+                        <label for="daily-usage" class="block text-sm font-medium text-gray-700">Daily Usage (Hours): <span id="daily-usage-value" class="font-bold text-blue-600">6</span></label>
+                        <input type="range" id="daily-usage" min="1" max="24" value="6" class="mt-2">
+                    </div>
+                    <div>
+                        <label for="run-duration" class="block text-sm font-medium text-gray-700">Total Run Duration (Days): <span id="run-duration-value" class="font-bold text-blue-600">7</span></label>
+                        <input type="range" id="run-duration" min="1" max="30" value="7" class="mt-2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="w-full lg:w-2/3">
+                <!-- Cost Comparison -->
+                <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+                    <h2 class="text-xl font-bold mb-2 text-gray-700">2. Estimated Cost Comparison</h2>
+                    <p class="text-sm text-gray-500 mb-6">Visualizes the total cost over the run duration.</p>
+                    <div id="chart" class="w-full h-80 flex justify-around items-end gap-4 border-b border-gray-200 pb-4">
+                        <!-- On-demand -->
+                        <div class="flex flex-col items-center h-full w-1/3">
+                           <div class="text-sm font-bold text-gray-800" id="on-demand-cost-label">$0</div>
+                           <div class="flex-grow flex items-end w-full justify-center">
+                               <div id="on-demand-bar" class="bar w-10 md:w-16 bg-blue-500" title="On-demand"></div>
+                           </div>
+                           <div class="text-sm font-medium mt-2">On-demand</div>
+                        </div>
+                        <!-- Reservations -->
+                        <div class="flex flex-col items-center h-full w-1/3">
+                           <div class="text-sm font-bold text-gray-800" id="reservation-cost-label">$0</div>
+                           <div class="flex-grow flex items-end w-full justify-center">
+                               <div id="reservation-bar" class="bar w-10 md:w-16 bg-red-500" title="1-Year Reservation"></div>
+                           </div>
+                           <div class="text-sm font-medium mt-2">Reservation</div>
+                        </div>
+                        <!-- Flex-start -->
+                        <div class="flex flex-col items-center h-full w-1/3">
+                           <div class="text-sm font-bold text-green-600" id="flex-start-cost-label">$0</div>
+                           <div class="flex-grow flex items-end w-full justify-center">
+                               <div id="flex-start-bar" class="bar w-10 md:w-16 bg-green-500" title="Flex-start"></div>
+                           </div>
+                           <div class="text-sm font-bold text-green-600 mt-2">Flex-start</div>
+                        </div>
+                    </div>
+                     <!-- Key Takeaways -->
+                    <div class="mt-6">
+                        <h3 class="font-bold text-lg text-gray-700">Key Takeaways</h3>
+                        <p id="takeaway-text" class="mt-2 text-gray-600"></p>
+                    </div>
+                </div>
+                
+                <!-- Availability Comparison -->
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-bold mb-2 text-gray-700">3. Availability & Start Time Trade-offs</h2>
+                     <p class="text-sm text-gray-500 mb-6">Illustrates how each model handles resource access.</p>
+                     <div class="space-y-5">
+                         <!-- On-demand Timeline -->
+                         <div>
+                             <h4 class="font-bold text-md">On-demand</h4>
+                             <p class="text-sm text-gray-500 mb-2">Immediate request, but can face stockouts if capacity is unavailable.</p>
+                             <div class="timeline-bar bg-gray-200">
+                                <div id="od-timeline" class="timeline-segment bg-blue-400">Request & Run</div>
+                                <div id="od-stockout" class="timeline-segment bg-gray-400" style="width: 0%;">Possible Stockout</div>
+                             </div>
+                         </div>
+                         <!-- Reservation Timeline -->
+                          <div>
+                             <h4 class="font-bold text-md">Reservation</h4>
+                             <p class="text-sm text-gray-500 mb-2">Capacity is guaranteed and paid for 24/7, regardless of use.</p>
+                             <div class="timeline-bar bg-red-200">
+                                <div id="res-idle-before" class="timeline-segment bg-red-300" style="width: 0%;">Idle (Paid)</div>
+                                <div id="res-running" class="timeline-segment bg-red-500">Workload Running</div>
+                                <div id="res-idle-after" class="timeline-segment bg-red-300" style="width: 0%;">Idle (Paid)</div>
+                             </div>
+                         </div>
+                         <!-- Flex-start Timeline -->
+                         <div>
+                             <h4 class="font-bold text-md text-green-700">Flex-start</h4>
+                             <p class="text-sm text-gray-500 mb-2">Your request persists until capacity is found, then runs at a discount.</p>
+                             <div class="timeline-bar bg-green-200">
+                                 <div class="timeline-segment bg-yellow-500" style="width: 20%;">Request Queued (Wait)</div>
+                                 <div class="timeline-segment bg-green-500" style="width: 80%;">Workload Running (Discounted)</div>
+                             </div>
+                         </div>
+                     </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        // Illustrative pricing (per GPU, per hour). Replace with actual pricing data if available.
+        const pricing = {
+            'L4':          { on_demand: 1.25, reserved: 0.88, flex_discount: 0.40 }, // 40% discount
+            'A100_40GB':   { on_demand: 3.80, reserved: 2.66, flex_discount: 0.40 }, // 40% discount
+            'H100_80GB':   { on_demand: 6.99, reserved: 4.89, flex_discount: 0.40 }  // 40% discount
+        };
+
+        // --- DOM ELEMENTS ---
+        const controls = {
+            gpuType: document.getElementById('gpu-type'),
+            numGpus: document.getElementById('num-gpus'),
+            dailyUsage: document.getElementById('daily-usage'),
+            runDuration: document.getElementById('run-duration')
+        };
+
+        const outputs = {
+            numGpusValue: document.getElementById('num-gpus-value'),
+            dailyUsageValue: document.getElementById('daily-usage-value'),
+            runDurationValue: document.getElementById('run-duration-value'),
+            onDemandCostLabel: document.getElementById('on-demand-cost-label'),
+            reservationCostLabel: document.getElementById('reservation-cost-label'),
+            flexStartCostLabel: document.getElementById('flex-start-cost-label'),
+            onDemandBar: document.getElementById('on-demand-bar'),
+            reservationBar: document.getElementById('reservation-bar'),
+            flexStartBar: document.getElementById('flex-start-bar'),
+            takeawayText: document.getElementById('takeaway-text'),
+            resIdleBefore: document.getElementById('res-idle-before'),
+            resRunning: document.getElementById('res-running'),
+            resIdleAfter: document.getElementById('res-idle-after'),
+        };
+
+        // --- FUNCTIONS ---
+        function formatCurrency(value) {
+            if (value > 1000) {
+                return `$${(value/1000).toFixed(1)}k`;
+            }
+            return `$${value.toFixed(0)}`;
+        }
+
+        function calculateAndRender() {
+            // 1. Get current values from controls
+            const gpuType = controls.gpuType.value;
+            const numGpus = parseInt(controls.numGpus.value);
+            const dailyUsage = parseInt(controls.dailyUsage.value);
+            const runDuration = parseInt(controls.runDuration.value);
+
+            // Update display values
+            outputs.numGpusValue.textContent = numGpus;
+            outputs.dailyUsageValue.textContent = dailyUsage;
+            outputs.runDurationValue.textContent = runDuration;
+
+            // 2. Calculate costs
+            const prices = pricing[gpuType];
+            const totalHours = dailyUsage * runDuration;
+
+            // On-demand: Pay for what you use at the standard rate
+            const onDemandCost = numGpus * prices.on_demand * totalHours;
+
+            // Reservation: Pay for the GPUs 24/7 for the duration, at a discounted hourly rate
+            const reservationCost = numGpus * prices.reserved * 24 * runDuration;
+            
+            // Flex-start: Pay for what you use, with a discount on the on-demand price
+            const flexStartCost = numGpus * (prices.on_demand * (1 - prices.flex_discount)) * totalHours;
+
+            // 3. Render Cost Chart
+            const maxCost = Math.max(onDemandCost, reservationCost, flexStartCost, 1);
+            const chartHeight = 280; // Corresponds to h-80 in Tailwind, minus padding
+
+            outputs.onDemandBar.style.height = `${(onDemandCost / maxCost) * 95}%`;
+            outputs.reservationBar.style.height = `${(reservationCost / maxCost) * 95}%`;
+            outputs.flexStartBar.style.height = `${(flexStartCost / maxCost) * 95}%`;
+            
+            outputs.onDemandCostLabel.textContent = formatCurrency(onDemandCost);
+            outputs.reservationCostLabel.textContent = formatCurrency(reservationCost);
+            outputs.flexStartCostLabel.textContent = formatCurrency(flexStartCost);
+
+            // 4. Render Key Takeaways
+            const savingsVsOd = 1 - (flexStartCost / onDemandCost);
+            const savingsVsRes = 1 - (flexStartCost / reservationCost);
+
+            let takeaway = '';
+            if (flexStartCost < onDemandCost && flexStartCost < reservationCost) {
+                takeaway = `For this workload, Flex-start is the most cost-effective. It saves you <strong>${(savingsVsOd * 100).toFixed(0)}%</strong> compared to On-demand by offering a price discount, and <strong>${(savingsVsRes * 100).toFixed(0)}%</strong> compared to Reservations by only charging for the <strong>${dailyUsage} hours/day</strong> you actually use.`;
+            } else if (flexStartCost < reservationCost) {
+                takeaway = `Because your workload runs for only ${dailyUsage} hours a day, Flex-start is cheaper than a 24/7 Reservation.`;
+            } else {
+                takeaway = `With high daily usage (${dailyUsage} hours), the cost of Flex-start may approach that of a Reservation. Flex-start's value shines for intermittent workloads.`;
+            }
+            outputs.takeawayText.innerHTML = takeaway;
+            
+            // 5. Render Availability Timeline
+            const dailyUsagePercent = (dailyUsage / 24) * 100;
+            const idlePercent = 100 - dailyUsagePercent;
+            const idleBefore = idlePercent / 2;
+            const idleAfter = idlePercent / 2;
+
+            outputs.resRunning.style.width = `${dailyUsagePercent}%`;
+            outputs.resIdleBefore.style.width = `${idleBefore}%`;
+            outputs.resIdleAfter.style.width = `${idleAfter}%`;
+        }
+
+        // --- EVENT LISTENERS ---
+        Object.values(controls).forEach(control => {
+            control.addEventListener('input', calculateAndRender);
+        });
+        
+        // Initial render on page load
+        window.addEventListener('load', calculateAndRender);
+
+    </script>
+</body>
+</html>
