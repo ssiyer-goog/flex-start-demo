@@ -107,7 +107,7 @@
                     </div>
                     <div>
                         <label for="run-duration" class="block text-sm font-medium text-gray-700">Total Run Duration (Days): <span id="run-duration-value" class="font-bold text-blue-600">7</span></label>
-                        <input type="range" id="run-duration" min="1" max="30" value="7" class="mt-2">
+                        <input type="range" id="run-duration" min="1" max="7" value="7" class="mt-2">
                     </div>
                 </div>
             </div>
@@ -193,11 +193,12 @@
 
     <script>
         // --- DATA ---
-        // Illustrative pricing (per GPU, per hour). Replace with actual pricing data if available.
+        // Illustrative pricing (per GPU, per hour). H100 prices updated based on user request.
+        // Reservation price is based on a 1-year CUD for comparison.
         const pricing = {
-            'L4':          { on_demand: 1.25, reserved: 0.88, flex_discount: 0.40 }, // 40% discount
-            'A100_40GB':   { on_demand: 3.80, reserved: 2.66, flex_discount: 0.40 }, // 40% discount
-            'H100_80GB':   { on_demand: 6.99, reserved: 4.89, flex_discount: 0.40 }  // 40% discount
+            'L4':          { on_demand: 1.25, reserved: 0.88, flex_start: 0.75 },
+            'A100_40GB':   { on_demand: 3.80, reserved: 2.66, flex_start: 2.28 },
+            'H100_80GB':   { on_demand: 11.06, reserved: 7.67, flex_start: 4.79 }
         };
 
         // --- DOM ELEMENTS ---
@@ -254,8 +255,8 @@
             // Reservation: Pay for the GPUs 24/7 for the duration, at a discounted hourly rate
             const reservationCost = numGpus * prices.reserved * 24 * runDuration;
             
-            // Flex-start: Pay for what you use, with a discount on the on-demand price
-            const flexStartCost = numGpus * (prices.on_demand * (1 - prices.flex_discount)) * totalHours;
+            // Flex-start: Pay for what you use, at the discounted Flex-start price
+            const flexStartCost = numGpus * prices.flex_start * totalHours;
 
             // 3. Render Cost Chart
             const maxCost = Math.max(onDemandCost, reservationCost, flexStartCost, 1);
